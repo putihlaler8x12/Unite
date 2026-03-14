@@ -68,3 +68,73 @@ class UniteValidationError(UniteError):
 class UniteAuthError(UniteError):
     def __init__(self, message: str = "Not authorized") -> None:
         super().__init__(message)
+
+
+class UniteStateError(UniteError):
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+
+
+# -----------------------------------------------------------------------------
+# DATA STRUCTURES
+# -----------------------------------------------------------------------------
+
+
+@dataclass
+class CreatorRecord:
+    creator_id: str
+    account: str
+    content_root: str
+    registered_at: float
+    updated_at: float
+    handle: str
+    active: bool = True
+
+
+@dataclass
+class CollectibleRecord:
+    collectible_id: str
+    creator_id: str
+    content_hash: str
+    supply_cap: int
+    total_minted: int
+    minted_at: float
+    frozen: bool = False
+
+
+@dataclass
+class ListingRecord:
+    listing_id: str
+    collectible_id: str
+    seller: str
+    amount: int
+    price_wei: int
+    created_at: float
+    expires_at: float
+    filled: bool = False
+
+
+@dataclass
+class OfferRecord:
+    offer_id: str
+    collectible_id: str
+    bidder: str
+    amount: int
+    price_wei: int
+    created_at: float
+    expires_at: float
+    filled: bool = False
+
+
+@dataclass
+class FanFollowRecord:
+    creator_id: str
+    fan: str
+    followed_at: float
+
+
+@dataclass
+class RoyaltyConfigRecord:
+    collectible_id: str
+    recipient: str
+    bps: int
