@@ -208,3 +208,73 @@ class UniteStore:
 
     def _serialize(self) -> Dict[str, Any]:
         creators = {
+            k: asdict(v)
+            for k, v in self._state.creators.items()
+        }
+        collectibles = {
+            k: asdict(v)
+            for k, v in self._state.collectibles.items()
+        }
+        listings = {
+            k: asdict(v)
+            for k, v in self._state.listings.items()
+        }
+        offers = {
+            k: asdict(v)
+            for k, v in self._state.offers.items()
+        }
+        fan_follows = [asdict(f) for f in self._state.fan_follows]
+        royalty_configs = {
+            k: asdict(v)
+            for k, v in self._state.royalty_configs.items()
+        }
+        collectible_balances = {
+            f"{c}|{a}": amt
+            for (c, a), amt in self._state.collectible_balances.items()
+        }
+        return {
+            "creators": creators,
+            "collectibles": collectibles,
+            "listings": listings,
+            "offers": offers,
+            "fan_follows": fan_follows,
+            "royalty_configs": royalty_configs,
+            "collectible_balances": collectible_balances,
+            "creator_by_address": self._state.creator_by_address,
+            "next_creator_num": self._state.next_creator_num,
+            "next_collectible_num": self._state.next_collectible_num,
+            "next_listing_num": self._state.next_listing_num,
+            "next_offer_num": self._state.next_offer_num,
+        }
+
+    def _deserialize(self, data: Dict[str, Any]) -> None:
+        self._state.creators = {
+            k: CreatorRecord(**v)
+            for k, v in data.get("creators", {}).items()
+        }
+        self._state.collectibles = {
+            k: CollectibleRecord(**v)
+            for k, v in data.get("collectibles", {}).items()
+        }
+        self._state.listings = {
+            k: ListingRecord(**v)
+            for k, v in data.get("listings", {}).items()
+        }
+        self._state.offers = {
+            k: OfferRecord(**v)
+            for k, v in data.get("offers", {}).items()
+        }
+        self._state.fan_follows = [
+            FanFollowRecord(**f)
+            for f in data.get("fan_follows", [])
+        ]
+        self._state.royalty_configs = {
+            k: RoyaltyConfigRecord(**v)
+            for k, v in data.get("royalty_configs", {}).items()
+        }
+        cb = data.get("collectible_balances", {})
+        self._state.collectible_balances = {
+            (k.split("|")[0], k.split("|")[1]): v
+            for k, v in cb.items()
+        }
+        self._state.creator_by_address = data.get("creator_by_address", {})
