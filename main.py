@@ -278,3 +278,73 @@ class UniteStore:
             for k, v in cb.items()
         }
         self._state.creator_by_address = data.get("creator_by_address", {})
+        self._state.next_creator_num = data.get("next_creator_num", 1)
+        self._state.next_collectible_num = data.get("next_collectible_num", 1)
+        self._state.next_listing_num = data.get("next_listing_num", 1)
+        self._state.next_offer_num = data.get("next_offer_num", 1)
+
+    @property
+    def state(self) -> UniteState:
+        return self._state
+
+    def get_creator(self, creator_id: str) -> CreatorRecord:
+        if creator_id not in self._state.creators:
+            raise UniteNotFoundError("Creator", creator_id)
+        return self._state.creators[creator_id]
+
+    def get_collectible(self, collectible_id: str) -> CollectibleRecord:
+        if collectible_id not in self._state.collectibles:
+            raise UniteNotFoundError("Collectible", collectible_id)
+        return self._state.collectibles[collectible_id]
+
+    def get_listing(self, listing_id: str) -> ListingRecord:
+        if listing_id not in self._state.listings:
+            raise UniteNotFoundError("Listing", listing_id)
+        return self._state.listings[listing_id]
+
+    def get_offer(self, offer_id: str) -> OfferRecord:
+        if offer_id not in self._state.offers:
+            raise UniteNotFoundError("Offer", offer_id)
+        return self._state.offers[offer_id]
+
+    def balance_of(self, collectible_id: str, account: str) -> int:
+        return self._state.collectible_balances.get((collectible_id, account), 0)
+
+    def creator_id_for_address(self, account: str) -> Optional[str]:
+        return self._state.creator_by_address.get(account)
+
+
+# -----------------------------------------------------------------------------
+# CORE OPERATIONS
+# -----------------------------------------------------------------------------
+
+
+class UniteApp:
+    def __init__(self, store: UniteStore) -> None:
+        self._store = store
+
+    def register_creator(
+        self,
+        account: str,
+        content_root: str,
+        handle: str,
+    ) -> CreatorRecord:
+        if self._store.creator_id_for_address(account):
+            raise UniteValidationError("account", "Already registered as creator")
+        if self._store.state.next_creator_num > UNITE_MAX_CREATORS:
+            raise UniteValidationError("next_creator_num", "Max creators reached")
+        now = time.time()
+        creator_id = f"{UNITE_CREATOR_PREFIX}{self._store.state.next_creator_num}"
+        self._store.state.next_creator_num += 1
+        rec = CreatorRecord(
+            creator_id=creator_id,
+            account=account,
+            content_root=content_root,
+            registered_at=now,
+            updated_at=now,
+            handle=handle,
+            active=True,
+        )
+        self._store.state.creators[creator_id] = rec
+        self._store.state.creator_by_address[account] = creator_id
+        return rec
