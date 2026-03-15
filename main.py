@@ -1608,3 +1608,73 @@ def search_creators_by_handle_prefix(store: UniteStore, prefix: str, limit: int 
 
 def unite_version_string() -> str:
     return f"{UNITE_VERSION[0]}.{UNITE_VERSION[1]}"
+
+
+def unite_build_info() -> Dict[str, Any]:
+    return {
+        "app": UNITE_APP_NAME,
+        "version": unite_version_string(),
+        "state_file": UNITE_STATE_FILE,
+        "default_rpc": UNITE_DEFAULT_RPC,
+        "chain_id": UNITE_CHAIN_ID,
+        "has_web3": _HAS_WEB3,
+        "max_creators": UNITE_MAX_CREATORS,
+        "max_collectibles_per_creator": UNITE_MAX_COLLECTIBLES_PER_CREATOR,
+        "default_fee_bps": UNITE_DEFAULT_FEE_BPS,
+        "royalty_bps_cap": UNITE_ROYALTY_BPS_CAP,
+    }
+
+
+def cmd_version(app: UniteApp, args: argparse.Namespace) -> None:
+    print(unite_version_string())
+    for k, v in unite_build_info().items():
+        print(f"  {k}: {v}")
+
+
+def get_default_duration_listing_seconds() -> int:
+    return 604800
+
+
+def get_default_duration_offer_seconds() -> int:
+    return 259200
+
+
+def api_base_path() -> str:
+    return "/api"
+
+
+# -----------------------------------------------------------------------------
+# PAGINATION HELPERS
+# -----------------------------------------------------------------------------
+
+
+def paginate_creators(store: UniteStore, page: int = 1, per_page: int = 20) -> Tuple[List[CreatorRecord], int]:
+    all_ids = sorted(store.state.creators.keys(), key=lambda x: store.state.creators[x].registered_at)
+    total = len(all_ids)
+    start = (page - 1) * per_page
+    if start >= total:
+        return [], total
+    ids = all_ids[start : start + per_page]
+    return [store.state.creators[i] for i in ids], total
+
+
+def paginate_collectibles(store: UniteStore, page: int = 1, per_page: int = 20) -> Tuple[List[CollectibleRecord], int]:
+    all_ids = sorted(store.state.collectibles.keys(), key=lambda x: store.state.collectibles[x].minted_at)
+    total = len(all_ids)
+    start = (page - 1) * per_page
+    if start >= total:
+        return [], total
+    ids = all_ids[start : start + per_page]
+    return [store.state.collectibles[i] for i in ids], total
+
+
+def paginate_listings(store: UniteStore, collectible_id: Optional[str] = None, page: int = 1, per_page: int = 20) -> Tuple[List[ListingRecord], int]:
+    listings = list_active_listings(store, collectible_id=collectible_id)
+    total = len(listings)
+    start = (page - 1) * per_page
+    if start >= total:
+        return [], total
+    return listings[start : start + per_page], total
+
+
+def paginate_offers(store: UniteStore, collectible_id: Optional[str] = None, page: int = 1, per_page: int = 20) -> Tuple[List[OfferRecord], int]:
