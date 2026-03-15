@@ -838,3 +838,73 @@ class UniteAPIHandler(BaseHTTPRequestHandler):
                 "content_hash": c.content_hash,
                 "supply_cap": c.supply_cap,
                 "total_minted": c.total_minted,
+                "frozen": c.frozen,
+            }
+            for c in colls
+        ]
+        self._json_response({"collectibles": data, "count": len(data)})
+
+    def _get_creator(self, creator_id: str) -> None:
+        store = getattr(self.server, "unite_store", None)
+        if not store:
+            self._json_response({"error": "Store not configured"}, 500)
+            return
+        try:
+            c = store.get_creator(creator_id)
+            self._json_response({
+                "creator_id": c.creator_id,
+                "handle": c.handle,
+                "account": c.account,
+                "content_root": c.content_root,
+                "active": c.active,
+                "registered_at": c.registered_at,
+                "updated_at": c.updated_at,
+                "follower_count": follower_count(store, creator_id),
+            })
+        except UniteNotFoundError:
+            self._json_response({"error": "Creator not found"}, 404)
+
+    def _get_collectible(self, collectible_id: str) -> None:
+        store = getattr(self.server, "unite_store", None)
+        if not store:
+            self._json_response({"error": "Store not configured"}, 500)
+            return
+        try:
+            c = store.get_collectible(collectible_id)
+            royalty = store.state.royalty_configs.get(collectible_id)
+            self._json_response({
+                "collectible_id": c.collectible_id,
+                "creator_id": c.creator_id,
+                "content_hash": c.content_hash,
+                "supply_cap": c.supply_cap,
+                "total_minted": c.total_minted,
+                "frozen": c.frozen,
+                "minted_at": c.minted_at,
+                "royalty_recipient": royalty.recipient if royalty else None,
+                "royalty_bps": royalty.bps if royalty else None,
+            })
+        except UniteNotFoundError:
+            self._json_response({"error": "Collectible not found"}, 404)
+
+    def _get_listings(self) -> None:
+        store = getattr(self.server, "unite_store", None)
+        if not store:
+            self._json_response({"error": "Store not configured"}, 500)
+            return
+        collectible_id = self._query().get("collectible_id")
+        listings = list_active_listings(store, collectible_id=collectible_id or None)
+        data = [
+            {
+                "listing_id": l.listing_id,
+                "collectible_id": l.collectible_id,
+                "seller": l.seller,
+                "amount": l.amount,
+                "price_wei": l.price_wei,
+                "expires_at": l.expires_at,
+            }
+            for l in listings
+        ]
+        self._json_response({"listings": data, "count": len(data)})
+
+    def _get_offers(self) -> None:
+        store = getattr(self.server, "unite_store", None)
