@@ -1188,3 +1188,73 @@ def load_config(config_path: Optional[Path] = None) -> Dict[str, Any]:
         return {}
 
 
+def save_config(config: Dict[str, Any], config_path: Optional[Path] = None) -> None:
+    path = config_path or Path("unite_config.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(config, f, indent=2)
+
+
+# -----------------------------------------------------------------------------
+# ANALYTICS HELPERS
+# -----------------------------------------------------------------------------
+
+
+def creator_stats(store: UniteStore, creator_id: str) -> Dict[str, Any]:
+    try:
+        c = store.get_creator(creator_id)
+    except UniteNotFoundError:
+        return {}
+    colls = list_collectibles_by_creator(store, creator_id)
+    followers = follower_count(store, creator_id)
+    return {
+        "creator_id": c.creator_id,
+        "handle": c.handle,
+        "account": c.account,
+        "active": c.active,
+        "collectible_count": len(colls),
+        "follower_count": followers,
+        "total_supply_minted": sum(x.total_minted for x in colls),
+    }
+
+
+def collectible_stats(store: UniteStore, collectible_id: str) -> Dict[str, Any]:
+    try:
+        c = store.get_collectible(collectible_id)
+    except UniteNotFoundError:
+        return {}
+    listings = list_active_listings(store, collectible_id=collectible_id)
+    offers = list_active_offers(store, collectible_id=collectible_id)
+    total_held = sum(
+        store.balance_of(collectible_id, a)
+        for (col, a) in store.state.collectible_balances
+        if col == collectible_id
+    )
+    return {
+        "collectible_id": c.collectible_id,
+        "creator_id": c.creator_id,
+        "supply_cap": c.supply_cap,
+        "total_minted": c.total_minted,
+        "active_listings": len(listings),
+        "active_offers": len(offers),
+        "total_held": total_held,
+    }
+
+
+def protocol_stats(store: UniteStore) -> Dict[str, Any]:
+    s = store.state
+    return {
+        "creators": len(s.creators),
+        "collectibles": len(s.collectibles),
+        "listings": len(s.listings),
+        "offers": len(s.offers),
+        "fan_follows": len(s.fan_follows),
+        "next_creator_num": s.next_creator_num,
+        "next_collectible_num": s.next_collectible_num,
+        "next_listing_num": s.next_listing_num,
+        "next_offer_num": s.next_offer_num,
+    }
+
+
+# -----------------------------------------------------------------------------
+# POST HANDLERS FOR REST API
+# -----------------------------------------------------------------------------
