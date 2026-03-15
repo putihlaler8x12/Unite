@@ -908,3 +908,73 @@ class UniteAPIHandler(BaseHTTPRequestHandler):
 
     def _get_offers(self) -> None:
         store = getattr(self.server, "unite_store", None)
+        if not store:
+            self._json_response({"error": "Store not configured"}, 500)
+            return
+        collectible_id = self._query().get("collectible_id")
+        offers = list_active_offers(store, collectible_id=collectible_id or None)
+        data = [
+            {
+                "offer_id": o.offer_id,
+                "collectible_id": o.collectible_id,
+                "bidder": o.bidder,
+                "amount": o.amount,
+                "price_wei": o.price_wei,
+                "expires_at": o.expires_at,
+            }
+            for o in offers
+        ]
+        self._json_response({"offers": data, "count": len(data)})
+
+    def _get_stats(self) -> None:
+        store = getattr(self.server, "unite_store", None)
+        if not store:
+            self._json_response({"error": "Store not configured"}, 500)
+            return
+        s = store.state
+        self._json_response({
+            "creators": len(s.creators),
+            "collectibles": len(s.collectibles),
+            "listings": len(s.listings),
+            "offers": len(s.offers),
+            "fan_follows": len(s.fan_follows),
+        })
+
+    def _serve_index(self) -> None:
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.end_headers()
+        self.wfile.write(b"<html><body><h1>Unite API</h1><p>Endpoints: /api/creators, /api/collectibles, /api/listings, /api/offers, /api/stats</p></body></html>")
+
+    def _query(self) -> Dict[str, str]:
+        q = self.path.split("?")[-1] if "?" in self.path else ""
+        out: Dict[str, str] = {}
+        for part in q.split("&"):
+            if "=" in part:
+                k, v = part.split("=", 1)
+                out[k] = v
+        return out
+
+    def _json_response(self, data: Dict[str, Any], status: int = 200) -> None:
+        body = json.dumps(data).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, format: str, *args: Any) -> None:
+        if os.environ.get("UNITE_DEBUG"):
+            super().log_message(format, *args)
+
+
+# -----------------------------------------------------------------------------
+# RPC CLIENT STUB (optional web3)
+# -----------------------------------------------------------------------------
+
+try:
+    from web3 import Web3
+    _HAS_WEB3 = True
+except ImportError:
+    _HAS_WEB3 = False
+
