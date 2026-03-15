@@ -1398,3 +1398,73 @@ def siamso_contract_abi_minimal() -> List[Dict[str, Any]]:
     return [
         {"inputs": [], "name": "totalCreators", "outputs": [{"type": "uint256"}], "stateMutability": "view", "type": "function"},
         {"inputs": [], "name": "totalCollectibles", "outputs": [{"type": "uint256"}], "stateMutability": "view", "type": "function"},
+        {"inputs": [], "name": "totalListingsCreated", "outputs": [{"type": "uint256"}], "stateMutability": "view", "type": "function"},
+        {"inputs": [], "name": "totalOffersCreated", "outputs": [{"type": "uint256"}], "stateMutability": "view", "type": "function"},
+        {"inputs": [], "name": "feeBps", "outputs": [{"type": "uint256"}], "stateMutability": "view", "type": "function"},
+        {"inputs": [], "name": "paused", "outputs": [{"type": "bool"}], "stateMutability": "view", "type": "function"},
+        {"inputs": [{"name": "creatorId", "type": "uint256"}], "name": "getCreator", "outputs": [{"type": "address"}, {"type": "bytes32"}, {"type": "uint64"}, {"type": "uint64"}, {"type": "string"}, {"type": "bool"}], "stateMutability": "view", "type": "function"},
+        {"inputs": [{"name": "collectibleId", "type": "uint256"}], "name": "getCollectible", "outputs": [{"type": "uint256"}, {"type": "bytes32"}, {"type": "uint256"}, {"type": "uint256"}, {"type": "uint64"}, {"type": "bool"}], "stateMutability": "view", "type": "function"},
+    ]
+
+
+def sync_from_chain_if_available(store: UniteStore, rpc_url: str, contract_address: str) -> Dict[str, Any]:
+    """If web3 available, optionally sync high-level stats from chain. Returns summary."""
+    if not _HAS_WEB3:
+        return {"synced": False, "reason": "web3 not installed"}
+    try:
+        w3 = Web3(Web3.HTTPProvider(rpc_url))
+        if not w3.is_connected():
+            return {"synced": False, "reason": "RPC not connected"}
+        # Contract would be loaded here with contract_address and ABI
+        return {"synced": False, "reason": "Contract not configured"}
+    except Exception as e:
+        return {"synced": False, "reason": str(e)}
+
+
+# -----------------------------------------------------------------------------
+# RESPONSE FORMAT HELPERS FOR API
+# -----------------------------------------------------------------------------
+
+
+def format_creator_for_api(c: CreatorRecord, store: UniteStore) -> Dict[str, Any]:
+    return {
+        "creator_id": c.creator_id,
+        "handle": c.handle,
+        "account": c.account,
+        "content_root": c.content_root,
+        "active": c.active,
+        "registered_at": c.registered_at,
+        "updated_at": c.updated_at,
+        "follower_count": follower_count(store, c.creator_id),
+    }
+
+
+def format_collectible_for_api(c: CollectibleRecord, store: UniteStore) -> Dict[str, Any]:
+    royalty = store.state.royalty_configs.get(c.collectible_id)
+    return {
+        "collectible_id": c.collectible_id,
+        "creator_id": c.creator_id,
+        "content_hash": c.content_hash,
+        "supply_cap": c.supply_cap,
+        "total_minted": c.total_minted,
+        "frozen": c.frozen,
+        "minted_at": c.minted_at,
+        "royalty_recipient": royalty.recipient if royalty else None,
+        "royalty_bps": royalty.bps if royalty else None,
+    }
+
+
+def format_listing_for_api(l: ListingRecord) -> Dict[str, Any]:
+    return {
+        "listing_id": l.listing_id,
+        "collectible_id": l.collectible_id,
+        "seller": l.seller,
+        "amount": l.amount,
+        "price_wei": l.price_wei,
+        "created_at": l.created_at,
+        "expires_at": l.expires_at,
+        "filled": l.filled,
+    }
+
+
+def format_offer_for_api(o: OfferRecord) -> Dict[str, Any]:
