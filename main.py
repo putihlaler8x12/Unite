@@ -488,3 +488,73 @@ class UniteApp:
         )
         self._store.state.listings[listing_id] = rec
         key = (collectible_id, seller)
+        self._store.state.collectible_balances[key] = self._store.state.collectible_balances.get(key, 0) - amount
+        return rec
+
+    def fill_listing(
+        self,
+        listing_id: str,
+        buyer: str,
+        amount: int,
+        value_wei: int,
+    ) -> None:
+        listing = self._store.get_listing(listing_id)
+        if listing.filled:
+            raise UniteValidationError("listing", "Listing already filled")
+        if time.time() > listing.expires_at:
+            raise UniteValidationError("listing", "Listing expired")
+        if amount <= 0 or amount > listing.amount:
+            raise UniteValidationError("amount", "Invalid amount")
+        total_wei = listing.price_wei * amount
+        if value_wei < total_wei:
+            raise UniteValidationError("value", "Insufficient value")
+        listing.amount -= amount
+        if listing.amount == 0:
+            listing.filled = True
+        key_buyer = (listing.collectible_id, buyer)
+        self._store.state.collectible_balances[key_buyer] = (
+            self._store.state.collectible_balances.get(key_buyer, 0) + amount
+        )
+
+    def cancel_listing(self, listing_id: str, seller: str) -> None:
+        listing = self._store.get_listing(listing_id)
+        if listing.seller != seller:
+            raise UniteAuthError("Not the seller")
+        if listing.filled:
+            raise UniteValidationError("listing", "Already filled")
+        amt = listing.amount
+        listing.amount = 0
+        listing.filled = True
+        key = (listing.collectible_id, seller)
+        self._store.state.collectible_balances[key] = self._store.state.collectible_balances.get(key, 0) + amt
+
+    def place_offer(
+        self,
+        collectible_id: str,
+        bidder: str,
+        amount: int,
+        price_wei: int,
+        duration_seconds: float,
+    ) -> OfferRecord:
+        if amount <= 0 or price_wei <= 0:
+            raise UniteValidationError("amount/price", "Must be positive")
+        self._store.get_collectible(collectible_id)
+        now = time.time()
+        offer_id = f"{UNITE_OFFER_PREFIX}{self._store.state.next_offer_num}"
+        self._store.state.next_offer_num += 1
+        rec = OfferRecord(
+            offer_id=offer_id,
+            collectible_id=collectible_id,
+            bidder=bidder,
+            amount=amount,
+            price_wei=price_wei,
+            created_at=now,
+            expires_at=now + duration_seconds,
+            filled=False,
+        )
+        self._store.state.offers[offer_id] = rec
+        return rec
+
+    def accept_offer(
+        self,
+        offer_id: str,
