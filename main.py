@@ -978,3 +978,73 @@ try:
 except ImportError:
     _HAS_WEB3 = False
 
+
+class SiamsoRpcClient:
+    """Optional RPC client for SiamsoProtocol contract. Use when web3 is installed."""
+
+    def __init__(
+        self,
+        rpc_url: str = UNITE_DEFAULT_RPC,
+        contract_address: Optional[str] = None,
+    ) -> None:
+        self.rpc_url = rpc_url
+        self.contract_address = contract_address
+        self._w3: Any = None
+        self._contract: Any = None
+
+    def connect(self) -> bool:
+        if not _HAS_WEB3:
+            return False
+        try:
+            self._w3 = Web3(Web3.HTTPProvider(self.rpc_url))
+            return self._w3.is_connected()
+        except Exception:
+            return False
+
+    def get_total_creators(self) -> Optional[int]:
+        if not _HAS_WEB3 or not self._contract:
+            return None
+        try:
+            return self._contract.functions.totalCreators().call()
+        except Exception:
+            return None
+
+    def get_total_collectibles(self) -> Optional[int]:
+        if not _HAS_WEB3 or not self._contract:
+            return None
+        try:
+            return self._contract.functions.totalCollectibles().call()
+        except Exception:
+            return None
+
+
+# -----------------------------------------------------------------------------
+# MAIN
+# -----------------------------------------------------------------------------
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(prog=UNITE_APP_NAME, description="Unite - SiamsoProtocol companion app")
+    parser.add_argument("--state", default=UNITE_STATE_FILE, help="State file path")
+    subparsers = parser.add_subparsers(dest="command", help="Commands")
+
+    # register-creator
+    p = subparsers.add_parser("register-creator")
+    p.add_argument("--account", required=True)
+    p.add_argument("--handle", required=True)
+    p.add_argument("--content-root", default=None)
+    p.set_defaults(func=cmd_register_creator)
+
+    # mint
+    p = subparsers.add_parser("mint")
+    p.add_argument("--creator-id", required=True)
+    p.add_argument("--account", required=True)
+    p.add_argument("--to", required=True)
+    p.add_argument("--supply-cap", type=int, default=1)
+    p.add_argument("--content-hash", default=None)
+    p.set_defaults(func=cmd_mint)
+
+    # follow
+    p = subparsers.add_parser("follow")
+    p.add_argument("--creator-id", required=True)
+    p.add_argument("--fan", required=True)
