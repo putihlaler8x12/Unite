@@ -1538,3 +1538,73 @@ def compute_listing_total(listing: ListingRecord, amount: int) -> int:
 
 
 def compute_offer_total(offer: OfferRecord, amount: int) -> int:
+    return offer.price_wei * amount
+
+
+# -----------------------------------------------------------------------------
+# BULK QUERY HELPERS
+# -----------------------------------------------------------------------------
+
+
+def get_creators_by_handles(store: UniteStore, handles: List[str]) -> List[CreatorRecord]:
+    out = []
+    for c in store.state.creators.values():
+        if c.handle in handles:
+            out.append(c)
+    return out
+
+
+def get_collectibles_by_creator_batch(store: UniteStore, creator_ids: List[str]) -> Dict[str, List[CollectibleRecord]]:
+    result: Dict[str, List[CollectibleRecord]] = {cid: [] for cid in creator_ids}
+    for c in store.state.collectibles.values():
+        if c.creator_id in result:
+            result[c.creator_id].append(c)
+    return result
+
+
+def get_balances_for_collectible(store: UniteStore, collectible_id: str) -> List[Tuple[str, int]]:
+    out = []
+    for (col, account), amt in store.state.collectible_balances.items():
+        if col == collectible_id and amt > 0:
+            out.append((account, amt))
+    return sorted(out, key=lambda x: -x[1])
+
+
+def get_listings_for_seller(store: UniteStore, seller: str) -> List[ListingRecord]:
+    return [
+        l for l in store.state.listings.values()
+        if l.seller == seller and not l.filled and l.amount > 0
+    ]
+
+
+def get_offers_for_bidder(store: UniteStore, bidder: str) -> List[OfferRecord]:
+    return [
+        o for o in store.state.offers.values()
+        if o.bidder == bidder and not o.filled and o.amount > 0
+    ]
+
+
+def get_followed_creators(store: UniteStore, fan: str) -> List[str]:
+    return [
+        f.creator_id for f in store.state.fan_follows
+        if f.fan == fan
+    ]
+
+
+def search_creators_by_handle_prefix(store: UniteStore, prefix: str, limit: int = 20) -> List[CreatorRecord]:
+    out = []
+    for c in sorted(store.state.creators.values(), key=lambda x: x.handle):
+        if c.handle.lower().startswith(prefix.lower()):
+            out.append(c)
+            if len(out) >= limit:
+                break
+    return out
+
+
+# -----------------------------------------------------------------------------
+# VERSION AND BUILD INFO
+# -----------------------------------------------------------------------------
+
+
+def unite_version_string() -> str:
+    return f"{UNITE_VERSION[0]}.{UNITE_VERSION[1]}"
