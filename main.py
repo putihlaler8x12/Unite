@@ -768,3 +768,73 @@ def cmd_stats(app: UniteApp, args: argparse.Namespace) -> None:
     print(f"Next listing num: {s.next_listing_num}")
     print(f"Next offer num: {s.next_offer_num}")
 
+
+# -----------------------------------------------------------------------------
+# REST API HANDLER
+# -----------------------------------------------------------------------------
+
+
+class UniteAPIHandler(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+
+    def do_GET(self) -> None:
+        path = self.path.split("?")[0]
+        if path == "/api/creators":
+            self._get_creators()
+        elif path == "/api/collectibles":
+            self._get_collectibles()
+        elif path.startswith("/api/creator/"):
+            self._get_creator(path.replace("/api/creator/", ""))
+        elif path.startswith("/api/collectible/"):
+            self._get_collectible(path.replace("/api/collectible/", ""))
+        elif path == "/api/listings":
+            self._get_listings()
+        elif path == "/api/offers":
+            self._get_offers()
+        elif path == "/api/stats":
+            self._get_stats()
+        elif path == "/" or path == "/index.html":
+            self._serve_index()
+        else:
+            self.send_error(404)
+
+    def _get_creators(self) -> None:
+        store = getattr(self.server, "unite_store", None)
+        if not store:
+            self._json_response({"error": "Store not configured"}, 500)
+            return
+        offset = int(self._query().get("offset", 0))
+        limit = int(self._query().get("limit", 50))
+        creators = list_creators(store, offset=offset, limit=limit)
+        data = [
+            {
+                "creator_id": c.creator_id,
+                "handle": c.handle,
+                "account": c.account,
+                "active": c.active,
+                "registered_at": c.registered_at,
+                "follower_count": follower_count(store, c.creator_id),
+            }
+            for c in creators
+        ]
+        self._json_response({"creators": data, "count": len(data)})
+
+    def _get_collectibles(self) -> None:
+        store = getattr(self.server, "unite_store", None)
+        if not store:
+            self._json_response({"error": "Store not configured"}, 500)
+            return
+        creator_id = self._query().get("creator_id")
+        offset = int(self._query().get("offset", 0))
+        limit = int(self._query().get("limit", 50))
+        if creator_id:
+            colls = list_collectibles_by_creator(store, creator_id)
+        else:
+            colls = list_collectibles(store, offset=offset, limit=limit)
+        data = [
+            {
+                "collectible_id": c.collectible_id,
+                "creator_id": c.creator_id,
+                "content_hash": c.content_hash,
+                "supply_cap": c.supply_cap,
+                "total_minted": c.total_minted,
