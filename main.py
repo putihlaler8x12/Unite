@@ -348,3 +348,73 @@ class UniteApp:
         self._store.state.creators[creator_id] = rec
         self._store.state.creator_by_address[account] = creator_id
         return rec
+
+    def update_creator_content(self, creator_id: str, account: str, new_content_root: str) -> CreatorRecord:
+        rec = self._store.get_creator(creator_id)
+        if rec.account != account:
+            raise UniteAuthError("Not the creator account")
+        if not rec.active:
+            raise UniteValidationError("creator", "Creator inactive")
+        rec.content_root = new_content_root
+        rec.updated_at = time.time()
+        return rec
+
+    def mint_collectible(
+        self,
+        creator_id: str,
+        account: str,
+        content_hash: str,
+        supply_cap: int,
+        to: str,
+    ) -> CollectibleRecord:
+        creator = self._store.get_creator(creator_id)
+        if creator.account != account:
+            raise UniteAuthError("Not the creator account")
+        if not creator.active:
+            raise UniteValidationError("creator", "Creator inactive")
+        if supply_cap < 1:
+            raise UniteValidationError("supply_cap", "Must be >= 1")
+        col_id = f"{UNITE_COLLECTIBLE_PREFIX}{self._store.state.next_collectible_num}"
+        self._store.state.next_collectible_num += 1
+        now = time.time()
+        rec = CollectibleRecord(
+            collectible_id=col_id,
+            creator_id=creator_id,
+            content_hash=content_hash,
+            supply_cap=supply_cap,
+            total_minted=1,
+            minted_at=now,
+            frozen=False,
+        )
+        self._store.state.collectibles[col_id] = rec
+        key = (col_id, to)
+        self._store.state.collectible_balances[key] = self._store.state.collectible_balances.get(key, 0) + 1
+        return rec
+
+    def mint_collectible_batch(
+        self,
+        creator_id: str,
+        account: str,
+        content_hash: str,
+        supply_cap: int,
+        recipients: List[str],
+    ) -> CollectibleRecord:
+        creator = self._store.get_creator(creator_id)
+        if creator.account != account:
+            raise UniteAuthError("Not the creator account")
+        if not creator.active:
+            raise UniteValidationError("creator", "Creator inactive")
+        if supply_cap < len(recipients):
+            raise UniteValidationError("supply_cap", "Supply cap less than recipients")
+        col_id = f"{UNITE_COLLECTIBLE_PREFIX}{self._store.state.next_collectible_num}"
+        self._store.state.next_collectible_num += 1
+        now = time.time()
+        rec = CollectibleRecord(
+            collectible_id=col_id,
+            creator_id=creator_id,
+            content_hash=content_hash,
+            supply_cap=supply_cap,
+            total_minted=len(recipients),
+            minted_at=now,
+            frozen=False,
+        )
