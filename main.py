@@ -1048,3 +1048,73 @@ def main() -> int:
     p = subparsers.add_parser("follow")
     p.add_argument("--creator-id", required=True)
     p.add_argument("--fan", required=True)
+    p.set_defaults(func=cmd_follow)
+
+    # list creators
+    p = subparsers.add_parser("list-creators")
+    p.add_argument("--offset", type=int, default=0)
+    p.add_argument("--limit", type=int, default=50)
+    p.set_defaults(func=cmd_list_creators)
+
+    # list collectibles
+    p = subparsers.add_parser("list-collectibles")
+    p.add_argument("--creator-id", default=None)
+    p.add_argument("--offset", type=int, default=0)
+    p.add_argument("--limit", type=int, default=50)
+    p.set_defaults(func=cmd_list_collectibles)
+
+    # list listings
+    p = subparsers.add_parser("list-listings")
+    p.add_argument("--collectible-id", default=None)
+    p.set_defaults(func=cmd_list_listings)
+
+    # list offers
+    p = subparsers.add_parser("list-offers")
+    p.add_argument("--collectible-id", default=None)
+    p.set_defaults(func=cmd_list_offers)
+
+    # balance
+    p = subparsers.add_parser("balance")
+    p.add_argument("--collectible-id", required=True)
+    p.add_argument("--account", required=True)
+    p.set_defaults(func=cmd_balance)
+
+    # create-listing
+    p = subparsers.add_parser("create-listing")
+    p.add_argument("--collectible-id", required=True)
+    p.add_argument("--seller", required=True)
+    p.add_argument("--amount", type=int, required=True)
+    p.add_argument("--price-wei", type=int, required=True)
+    p.add_argument("--duration", type=int, default=None)
+    p.set_defaults(func=cmd_create_listing)
+
+    # place-offer
+    p = subparsers.add_parser("place-offer")
+    p.add_argument("--collectible-id", required=True)
+    p.add_argument("--bidder", required=True)
+    p.add_argument("--amount", type=int, required=True)
+    p.add_argument("--price-wei", type=int, required=True)
+    p.add_argument("--duration", type=int, default=None)
+    p.set_defaults(func=cmd_place_offer)
+
+    # stats
+    p = subparsers.add_parser("stats")
+    p.set_defaults(func=cmd_stats)
+
+    # serve
+    p = subparsers.add_parser("serve")
+    p.add_argument("--host", default="127.0.0.1")
+    p.add_argument("--port", type=int, default=8765)
+    p.set_defaults(func=lambda app, args: run_server(app, args))
+
+    _add_extra_commands(subparsers)
+
+    args = parser.parse_args()
+    if not args.command:
+        parser.print_help()
+        return 0
+
+    store = UniteStore(state_path=Path(args.state))
+    try:
+        store.load()
+    except UniteStateError:
