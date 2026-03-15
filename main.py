@@ -558,3 +558,73 @@ class UniteApp:
     def accept_offer(
         self,
         offer_id: str,
+        seller: str,
+        amount: int,
+    ) -> None:
+        offer = self._store.get_offer(offer_id)
+        if offer.filled:
+            raise UniteValidationError("offer", "Offer already filled")
+        if time.time() > offer.expires_at:
+            raise UniteValidationError("offer", "Offer expired")
+        if amount <= 0 or amount > offer.amount:
+            raise UniteValidationError("amount", "Invalid amount")
+        bal = self._store.balance_of(offer.collectible_id, seller)
+        if bal < amount:
+            raise UniteValidationError("balance", "Insufficient balance")
+        offer.amount -= amount
+        if offer.amount == 0:
+            offer.filled = True
+        key_seller = (offer.collectible_id, seller)
+        key_bidder = (offer.collectible_id, offer.bidder)
+        self._store.state.collectible_balances[key_seller] = (
+            self._store.state.collectible_balances.get(key_seller, 0) - amount
+        )
+        self._store.state.collectible_balances[key_bidder] = (
+            self._store.state.collectible_balances.get(key_bidder, 0) + amount
+        )
+
+    def cancel_offer(self, offer_id: str, bidder: str) -> None:
+        offer = self._store.get_offer(offer_id)
+        if offer.bidder != bidder:
+            raise UniteAuthError("Not the bidder")
+        if offer.filled:
+            raise UniteValidationError("offer", "Already filled")
+        offer.amount = 0
+        offer.filled = True
+
+    def set_royalty(self, collectible_id: str, creator_account: str, recipient: str, bps: int) -> None:
+        col = self._store.get_collectible(collectible_id)
+        creator = self._store.get_creator(col.creator_id)
+        if creator.account != creator_account:
+            raise UniteAuthError("Not the creator")
+        if bps > UNITE_ROYALTY_BPS_CAP:
+            raise UniteValidationError("bps", "Royalty bps exceeds cap")
+        self._store.state.royalty_configs[collectible_id] = RoyaltyConfigRecord(
+            collectible_id=collectible_id,
+            recipient=recipient,
+            bps=bps,
+        )
+
+
+# -----------------------------------------------------------------------------
+# QUERIES AND PAGINATION
+# -----------------------------------------------------------------------------
+
+
+def list_creators(store: UniteStore, offset: int = 0, limit: int = 50) -> List[CreatorRecord]:
+    ids = sorted(store.state.creators.keys(), key=lambda x: store.state.creators[x].registered_at)
+    return [store.state.creators[i] for i in ids[offset : offset + limit]]
+
+
+def list_collectibles(store: UniteStore, offset: int = 0, limit: int = 50) -> List[CollectibleRecord]:
+    ids = sorted(store.state.collectibles.keys(), key=lambda x: store.state.collectibles[x].minted_at)
+    return [store.state.collectibles[i] for i in ids[offset : offset + limit]]
+
+
+def list_collectibles_by_creator(store: UniteStore, creator_id: str) -> List[CollectibleRecord]:
+    return [
+        c for c in store.state.collectibles.values()
+        if c.creator_id == creator_id
+    ]
+
+
