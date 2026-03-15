@@ -698,3 +698,73 @@ def cmd_list_creators(app: UniteApp, args: argparse.Namespace) -> None:
     print(f"Total shown: {len(creators)}")
 
 
+def cmd_list_collectibles(app: UniteApp, args: argparse.Namespace) -> None:
+    store = app._store
+    if args.creator_id:
+        colls = list_collectibles_by_creator(store, args.creator_id)
+    else:
+        colls = list_collectibles(store, offset=args.offset, limit=args.limit)
+    for c in colls:
+        print(f"{c.collectible_id} | creator={c.creator_id} | supply={c.total_minted}/{c.supply_cap} | frozen={c.frozen}")
+    print(f"Total shown: {len(colls)}")
+
+
+def cmd_list_listings(app: UniteApp, args: argparse.Namespace) -> None:
+    store = app._store
+    listings = list_active_listings(store, collectible_id=args.collectible_id or None)
+    for l in listings:
+        print(f"{l.listing_id} | col={l.collectible_id} | seller={l.seller} | amount={l.amount} | price_wei={l.price_wei}")
+    print(f"Total shown: {len(listings)}")
+
+
+def cmd_list_offers(app: UniteApp, args: argparse.Namespace) -> None:
+    store = app._store
+    offers = list_active_offers(store, collectible_id=args.collectible_id or None)
+    for o in offers:
+        print(f"{o.offer_id} | col={o.collectible_id} | bidder={o.bidder} | amount={o.amount} | price_wei={o.price_wei}")
+    print(f"Total shown: {len(offers)}")
+
+
+def cmd_balance(app: UniteApp, args: argparse.Namespace) -> None:
+    bal = app._store.balance_of(args.collectible_id, args.account)
+    print(f"Balance: {bal}")
+
+
+def cmd_create_listing(app: UniteApp, args: argparse.Namespace) -> None:
+    duration = args.duration or 604800
+    rec = app.create_listing(
+        collectible_id=args.collectible_id,
+        seller=args.seller,
+        amount=args.amount,
+        price_wei=args.price_wei,
+        duration_seconds=duration,
+    )
+    print(f"Created listing: {rec.listing_id}")
+    app._store.save()
+
+
+def cmd_place_offer(app: UniteApp, args: argparse.Namespace) -> None:
+    duration = args.duration or 259200
+    rec = app.place_offer(
+        collectible_id=args.collectible_id,
+        bidder=args.bidder,
+        amount=args.amount,
+        price_wei=args.price_wei,
+        duration_seconds=duration,
+    )
+    print(f"Placed offer: {rec.offer_id}")
+    app._store.save()
+
+
+def cmd_stats(app: UniteApp, args: argparse.Namespace) -> None:
+    s = app._store.state
+    print(f"Creators: {len(s.creators)}")
+    print(f"Collectibles: {len(s.collectibles)}")
+    print(f"Listings: {len(s.listings)}")
+    print(f"Offers: {len(s.offers)}")
+    print(f"Fan follows: {len(s.fan_follows)}")
+    print(f"Next creator num: {s.next_creator_num}")
+    print(f"Next collectible num: {s.next_collectible_num}")
+    print(f"Next listing num: {s.next_listing_num}")
+    print(f"Next offer num: {s.next_offer_num}")
+
