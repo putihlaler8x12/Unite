@@ -628,3 +628,73 @@ def list_collectibles_by_creator(store: UniteStore, creator_id: str) -> List[Col
     ]
 
 
+def list_active_listings(store: UniteStore, collectible_id: Optional[str] = None) -> List[ListingRecord]:
+    now = time.time()
+    out = [
+        l for l in store.state.listings.values()
+        if not l.filled and l.amount > 0 and l.expires_at > now
+    ]
+    if collectible_id:
+        out = [l for l in out if l.collectible_id == collectible_id]
+    return sorted(out, key=lambda x: x.created_at)
+
+
+def list_active_offers(store: UniteStore, collectible_id: Optional[str] = None) -> List[OfferRecord]:
+    now = time.time()
+    out = [
+        o for o in store.state.offers.values()
+        if not o.filled and o.amount > 0 and o.expires_at > now
+    ]
+    if collectible_id:
+        out = [o for o in out if o.collectible_id == collectible_id]
+    return sorted(out, key=lambda x: x.created_at)
+
+
+def follower_count(store: UniteStore, creator_id: str) -> int:
+    return sum(1 for f in store.state.fan_follows if f.creator_id == creator_id)
+
+
+# -----------------------------------------------------------------------------
+# CLI
+# -----------------------------------------------------------------------------
+
+
+def cmd_register_creator(app: UniteApp, args: argparse.Namespace) -> None:
+    content_root = args.content_root or content_hash_str(str(random.random()))
+    rec = app.register_creator(
+        account=args.account,
+        content_root=content_root,
+        handle=args.handle,
+    )
+    print(f"Registered creator: {rec.creator_id} ({rec.handle})")
+    app._store.save()
+
+
+def cmd_mint(app: UniteApp, args: argparse.Namespace) -> None:
+    content_hash = args.content_hash or content_hash_str(str(time.time()))
+    rec = app.mint_collectible(
+        creator_id=args.creator_id,
+        account=args.account,
+        content_hash=content_hash,
+        supply_cap=args.supply_cap,
+        to=args.to,
+    )
+    print(f"Minted collectible: {rec.collectible_id} to {args.to}")
+    app._store.save()
+
+
+def cmd_follow(app: UniteApp, args: argparse.Namespace) -> None:
+    app.follow(creator_id=args.creator_id, fan=args.fan)
+    print(f"Followed creator {args.creator_id}")
+    app._store.save()
+
+
+def cmd_list_creators(app: UniteApp, args: argparse.Namespace) -> None:
+    store = app._store
+    creators = list_creators(store, offset=args.offset, limit=args.limit)
+    for c in creators:
+        cnt = follower_count(store, c.creator_id)
+        print(f"{c.creator_id} | {c.handle} | {c.account} | followers={cnt} | active={c.active}")
+    print(f"Total shown: {len(creators)}")
+
+
