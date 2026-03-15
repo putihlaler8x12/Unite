@@ -1258,3 +1258,73 @@ def protocol_stats(store: UniteStore) -> Dict[str, Any]:
 # -----------------------------------------------------------------------------
 # POST HANDLERS FOR REST API
 # -----------------------------------------------------------------------------
+
+
+def parse_body(handler: BaseHTTPRequestHandler) -> Dict[str, Any]:
+    length = int(handler.headers.get("Content-Length", 0))
+    if length == 0:
+        return {}
+    raw = handler.rfile.read(length)
+    return json.loads(raw.decode("utf-8"))
+
+
+def UniteAPIHandler_do_POST(handler: UniteAPIHandler) -> None:
+    path = handler.path.split("?")[0]
+    store = getattr(handler.server, "unite_store", None)
+    if not store:
+        handler._json_response({"error": "Store not configured"}, 500)
+        return
+    app = UniteApp(store)
+    try:
+        body = parse_body(handler)
+    except (json.JSONDecodeError, ValueError):
+        handler._json_response({"error": "Invalid JSON body"}, 400)
+        return
+    if path == "/api/register-creator":
+        try:
+            rec = app.register_creator(
+                account=body["account"],
+                content_root=body.get("content_root") or content_hash_str(str(random.random())),
+                handle=body["handle"],
+            )
+            store.save()
+            handler._json_response({"creator_id": rec.creator_id, "handle": rec.handle}, 201)
+        except (KeyError, UniteError) as e:
+            handler._json_response({"error": str(e)}, 400)
+    elif path == "/api/follow":
+        try:
+            app.follow(creator_id=body["creator_id"], fan=body["fan"])
+            store.save()
+            handler._json_response({"ok": True}, 201)
+        except (KeyError, UniteError) as e:
+            handler._json_response({"error": str(e)}, 400)
+    elif path == "/api/mint":
+        try:
+            rec = app.mint_collectible(
+                creator_id=body["creator_id"],
+                account=body["account"],
+                content_hash=body.get("content_hash") or content_hash_str(str(time.time())),
+                supply_cap=int(body.get("supply_cap", 1)),
+                to=body["to"],
+            )
+            store.save()
+            handler._json_response({"collectible_id": rec.collectible_id}, 201)
+        except (KeyError, UniteError) as e:
+            handler._json_response({"error": str(e)}, 400)
+    else:
+        handler.send_error(404)
+
+
+# Monkey-patch POST
+_original_UniteAPIHandler_do_GET = UniteAPIHandler.do_GET
+def _UniteAPIHandler_do_POST(self: UniteAPIHandler) -> None:
+    UniteAPIHandler_do_POST(self)
+UniteAPIHandler.do_POST = _UniteAPIHandler_do_POST
+
+
+# -----------------------------------------------------------------------------
+# ADDITIONAL CLI COMMANDS
+# -----------------------------------------------------------------------------
+
+
+def cmd_creator_stats(app: UniteApp, args: argparse.Namespace) -> None:
