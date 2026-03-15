@@ -418,3 +418,73 @@ class UniteApp:
             minted_at=now,
             frozen=False,
         )
+        self._store.state.collectibles[col_id] = rec
+        for to in recipients:
+            key = (col_id, to)
+            self._store.state.collectible_balances[key] = self._store.state.collectible_balances.get(key, 0) + 1
+        return rec
+
+    def transfer_collectible(
+        self,
+        collectible_id: str,
+        from_account: str,
+        to: str,
+        amount: int,
+    ) -> None:
+        if amount <= 0:
+            raise UniteValidationError("amount", "Must be positive")
+        bal = self._store.balance_of(collectible_id, from_account)
+        if bal < amount:
+            raise UniteValidationError("balance", "Insufficient balance")
+        key_from = (collectible_id, from_account)
+        key_to = (collectible_id, to)
+        self._store.state.collectible_balances[key_from] = bal - amount
+        self._store.state.collectible_balances[key_to] = self._store.state.collectible_balances.get(key_to, 0) + amount
+
+    def follow(self, creator_id: str, fan: str) -> None:
+        self._store.get_creator(creator_id)
+        self._store.state.fan_follows.append(
+            FanFollowRecord(creator_id=creator_id, fan=fan, followed_at=time.time())
+        )
+
+    def unfollow(self, creator_id: str, fan: str) -> None:
+        self._store.state.fan_follows = [
+            f for f in self._store.state.fan_follows
+            if not (f.creator_id == creator_id and f.fan == fan)
+        ]
+
+    def is_follower(self, creator_id: str, fan: str) -> bool:
+        return any(
+            f.creator_id == creator_id and f.fan == fan
+            for f in self._store.state.fan_follows
+        )
+
+    def create_listing(
+        self,
+        collectible_id: str,
+        seller: str,
+        amount: int,
+        price_wei: int,
+        duration_seconds: float,
+    ) -> ListingRecord:
+        if amount <= 0 or price_wei <= 0:
+            raise UniteValidationError("amount/price", "Must be positive")
+        bal = self._store.balance_of(collectible_id, seller)
+        if bal < amount:
+            raise UniteValidationError("balance", "Insufficient balance")
+        self._store.get_collectible(collectible_id)
+        now = time.time()
+        listing_id = f"{UNITE_LISTING_PREFIX}{self._store.state.next_listing_num}"
+        self._store.state.next_listing_num += 1
+        rec = ListingRecord(
+            listing_id=listing_id,
+            collectible_id=collectible_id,
+            seller=seller,
+            amount=amount,
+            price_wei=price_wei,
+            created_at=now,
+            expires_at=now + duration_seconds,
+            filled=False,
+        )
+        self._store.state.listings[listing_id] = rec
+        key = (collectible_id, seller)
