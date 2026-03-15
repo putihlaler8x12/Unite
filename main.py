@@ -1678,3 +1678,58 @@ def paginate_listings(store: UniteStore, collectible_id: Optional[str] = None, p
 
 
 def paginate_offers(store: UniteStore, collectible_id: Optional[str] = None, page: int = 1, per_page: int = 20) -> Tuple[List[OfferRecord], int]:
+    offers = list_active_offers(store, collectible_id=collectible_id)
+    total = len(offers)
+    start = (page - 1) * per_page
+    if start >= total:
+        return [], total
+    return offers[start : start + per_page], total
+
+
+# -----------------------------------------------------------------------------
+# WIRE ADDITIONAL CLI IN MAIN
+# -----------------------------------------------------------------------------
+
+
+def _add_extra_commands(subparsers: argparse._SubParsersAction) -> None:
+    p = subparsers.add_parser("export")
+    p.add_argument("--output", default=None)
+    p.set_defaults(func=cmd_export)
+    p = subparsers.add_parser("import")
+    p.add_argument("--input", default=None)
+    p.set_defaults(func=cmd_import)
+    p = subparsers.add_parser("creator-stats")
+    p.add_argument("--creator-id", required=True)
+    p.set_defaults(func=cmd_creator_stats)
+    p = subparsers.add_parser("collectible-stats")
+    p.add_argument("--collectible-id", required=True)
+    p.set_defaults(func=cmd_collectible_stats)
+    p = subparsers.add_parser("protocol-stats")
+    p.set_defaults(func=cmd_protocol_stats)
+    p = subparsers.add_parser("content-hash")
+    p.add_argument("--payload", default=None)
+    p.set_defaults(func=cmd_content_hash)
+    p = subparsers.add_parser("unfollow")
+    p.add_argument("--creator-id", required=True)
+    p.add_argument("--fan", required=True)
+    p.set_defaults(func=cmd_unfollow)
+    p = subparsers.add_parser("set-royalty")
+    p.add_argument("--collectible-id", required=True)
+    p.add_argument("--account", required=True)
+    p.add_argument("--recipient", required=True)
+    p.add_argument("--bps", type=int, required=True)
+    p.set_defaults(func=cmd_set_royalty)
+    p = subparsers.add_parser("cancel-listing")
+    p.add_argument("--listing-id", required=True)
+    p.add_argument("--seller", required=True)
+    p.set_defaults(func=cmd_cancel_listing)
+    p = subparsers.add_parser("cancel-offer")
+    p.add_argument("--offer-id", required=True)
+    p.add_argument("--bidder", required=True)
+    p.set_defaults(func=cmd_cancel_offer)
+    p = subparsers.add_parser("version")
+    p.set_defaults(func=cmd_version)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
