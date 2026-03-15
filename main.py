@@ -1468,3 +1468,73 @@ def format_listing_for_api(l: ListingRecord) -> Dict[str, Any]:
 
 
 def format_offer_for_api(o: OfferRecord) -> Dict[str, Any]:
+    return {
+        "offer_id": o.offer_id,
+        "collectible_id": o.collectible_id,
+        "bidder": o.bidder,
+        "amount": o.amount,
+        "price_wei": o.price_wei,
+        "created_at": o.created_at,
+        "expires_at": o.expires_at,
+        "filled": o.filled,
+    }
+
+
+# -----------------------------------------------------------------------------
+# VALIDATION HELPERS
+# -----------------------------------------------------------------------------
+
+
+def validate_eth_address(addr: str) -> bool:
+    if not addr or len(addr) != 42 or not addr.startswith("0x"):
+        return False
+    try:
+        return all(c in "0123456789aAbBcCdDeEfF" for c in addr[2:])
+    except Exception:
+        return False
+
+
+def validate_creator_id(creator_id: str) -> bool:
+    return creator_id.startswith(UNITE_CREATOR_PREFIX) and creator_id[len(UNITE_CREATOR_PREFIX):].isdigit()
+
+
+def validate_collectible_id(collectible_id: str) -> bool:
+    return collectible_id.startswith(UNITE_COLLECTIBLE_PREFIX) and collectible_id[len(UNITE_COLLECTIBLE_PREFIX):].isdigit()
+
+
+def validate_handle(handle: str) -> Tuple[bool, str]:
+    if not handle or len(handle) > 64:
+        return False, "Handle length must be 1-64"
+    if not all(c.isalnum() or c in "_-" for c in handle):
+        return False, "Handle must be alphanumeric, underscore, or hyphen"
+    return True, ""
+
+
+def validate_content_root(root: str) -> bool:
+    return len(root) == 64 and all(c in "0123456789abcdef" for c in root.lower())
+
+
+# -----------------------------------------------------------------------------
+# FEE AND ROYALTY CALCULATION
+# -----------------------------------------------------------------------------
+
+
+def compute_fee_wei(amount_wei: int, fee_bps: int = UNITE_DEFAULT_FEE_BPS) -> int:
+    return (amount_wei * fee_bps) // 10_000
+
+
+def compute_royalty_wei(amount_wei: int, royalty_bps: int) -> int:
+    return (amount_wei * royalty_bps) // 10_000
+
+
+def compute_seller_proceeds(amount_wei: int, fee_bps: int, royalty_bps: int = 0) -> int:
+    fee = compute_fee_wei(amount_wei, fee_bps)
+    royalty = compute_royalty_wei(amount_wei, royalty_bps)
+    return amount_wei - fee - royalty
+
+
+def compute_listing_total(listing: ListingRecord, amount: int) -> int:
+    return listing.price_wei * amount
+
+
+def compute_offer_total(offer: OfferRecord, amount: int) -> int:
