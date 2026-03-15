@@ -1328,3 +1328,73 @@ UniteAPIHandler.do_POST = _UniteAPIHandler_do_POST
 
 
 def cmd_creator_stats(app: UniteApp, args: argparse.Namespace) -> None:
+    store = app._store
+    stats = creator_stats(store, args.creator_id)
+    if not stats:
+        print("Creator not found")
+        return
+    for k, v in stats.items():
+        print(f"{k}: {v}")
+
+
+def cmd_collectible_stats(app: UniteApp, args: argparse.Namespace) -> None:
+    store = app._store
+    stats = collectible_stats(store, args.collectible_id)
+    if not stats:
+        print("Collectible not found")
+        return
+    for k, v in stats.items():
+        print(f"{k}: {v}")
+
+
+def cmd_protocol_stats(app: UniteApp, args: argparse.Namespace) -> None:
+    store = app._store
+    for k, v in protocol_stats(store).items():
+        print(f"{k}: {v}")
+
+
+def cmd_content_hash(app: UniteApp, args: argparse.Namespace) -> None:
+    payload = getattr(args, "payload", " ") or " "
+    h = content_hash_str(payload)
+    print(f"content_hash: {h}")
+
+
+def cmd_unfollow(app: UniteApp, args: argparse.Namespace) -> None:
+    app.unfollow(creator_id=args.creator_id, fan=args.fan)
+    print(f"Unfollowed creator {args.creator_id}")
+    app._store.save()
+
+
+def cmd_set_royalty(app: UniteApp, args: argparse.Namespace) -> None:
+    app.set_royalty(
+        collectible_id=args.collectible_id,
+        creator_account=args.account,
+        recipient=args.recipient,
+        bps=args.bps,
+    )
+    print("Royalty set")
+    app._store.save()
+
+
+def cmd_cancel_listing(app: UniteApp, args: argparse.Namespace) -> None:
+    app.cancel_listing(listing_id=args.listing_id, seller=args.seller)
+    print("Listing cancelled")
+    app._store.save()
+
+
+def cmd_cancel_offer(app: UniteApp, args: argparse.Namespace) -> None:
+    app.cancel_offer(offer_id=args.offer_id, bidder=args.bidder)
+    print("Offer cancelled")
+    app._store.save()
+
+
+# -----------------------------------------------------------------------------
+# RPC CLIENT EXTENDED
+# -----------------------------------------------------------------------------
+
+
+def siamso_contract_abi_minimal() -> List[Dict[str, Any]]:
+    """Minimal ABI for read-only calls to SiamsoProtocol."""
+    return [
+        {"inputs": [], "name": "totalCreators", "outputs": [{"type": "uint256"}], "stateMutability": "view", "type": "function"},
+        {"inputs": [], "name": "totalCollectibles", "outputs": [{"type": "uint256"}], "stateMutability": "view", "type": "function"},
