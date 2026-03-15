@@ -1118,3 +1118,73 @@ def main() -> int:
     try:
         store.load()
     except UniteStateError:
+        pass
+    app = UniteApp(store)
+
+    try:
+        args.func(app, args)
+    except (UniteError, KeyError) as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def run_server(app: UniteApp, args: argparse.Namespace) -> None:
+    host = args.host
+    port = args.port
+    server = HTTPServer((host, port), UniteAPIHandler)
+    server.unite_store = app._store
+    print(f"Serving Unite API at http://{host}:{port}")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        server.shutdown()
+
+
+# -----------------------------------------------------------------------------
+# EXPORT / IMPORT
+# -----------------------------------------------------------------------------
+
+
+def export_state_json(store: UniteStore) -> str:
+    data = store._serialize()
+    return json.dumps(data, indent=2)
+
+
+def import_state_json(store: UniteStore, json_str: str) -> None:
+    data = json.loads(json_str)
+    store._deserialize(data)
+
+
+def cmd_export(app: UniteApp, args: argparse.Namespace) -> None:
+    path = getattr(args, "output", None) or "unite_export.json"
+    s = export_state_json(app._store)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(s)
+    print(f"Exported to {path}")
+
+
+def cmd_import(app: UniteApp, args: argparse.Namespace) -> None:
+    path = getattr(args, "input", None) or "unite_export.json"
+    with open(path, "r", encoding="utf-8") as f:
+        import_state_json(app._store, f.read())
+    app._store.save()
+    print(f"Imported from {path}")
+
+
+# -----------------------------------------------------------------------------
+# CONFIG LOADER
+# -----------------------------------------------------------------------------
+
+
+def load_config(config_path: Optional[Path] = None) -> Dict[str, Any]:
+    path = config_path or Path("unite_config.json")
+    if not path.exists():
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
